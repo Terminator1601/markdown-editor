@@ -164,6 +164,19 @@ CRITICAL INSTRUCTIONS:
    - List formatting and numbering
    - Table structures
 
+INTELLIGENT TEXT MATCHING:
+- When user says "replace X with Y", look for variations of X in the text
+- Handle common abbreviations and variations:
+  * USA = U.S.A. = United States of America = United States
+  * UK = U.K. = United Kingdom
+  * US = U.S. = United States
+- Handle case variations: usa = USA = Usa = U.S.A.
+- Look for similar words even with punctuation differences
+- Examples:
+  * "replace usa with india" should find and replace "U.S.A." with "india"
+  * "replace america with france" should find "America" or "U.S.A." and replace
+  * "replace us with uk" should find "U.S." and replace with "UK"
+
 ${isSelection ? 
 'CONTEXT: You are editing SELECTED TEXT. Return only the modified selected text, maintaining its exact format and structure.' :
 'CONTEXT: You are editing document content. Preserve the document structure and formatting.'

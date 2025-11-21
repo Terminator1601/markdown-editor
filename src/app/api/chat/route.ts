@@ -233,6 +233,16 @@ CRITICAL FORMATTING RULES - MUST FOLLOW EXACTLY:
 5. Keep all formatting, punctuation, and structure exactly as provided
 6. If editing text, change ONLY the requested words, leave everything else untouched
 
+INTELLIGENT TEXT MATCHING:
+- When user says "replace X with Y", look for variations of X in the text
+- Common abbreviations: USA = U.S.A. = United States of America
+- Handle case variations: usa = USA = Usa = U.S.A.
+- Look for similar words even with punctuation differences
+- Examples:
+  * "replace usa with india" should find and replace "U.S.A." with "india"
+  * "replace us with uk" should find "U.S." and replace with "UK"
+  * "replace america with france" should find "America" or "U.S.A." and replace
+
 SELECTED TEXT HANDLING:
 - You will receive ONLY the selected text that user wants to edit
 - Return ONLY the modified version of that exact selected text
@@ -273,6 +283,20 @@ Selected text: "\\title{ CONTROL VALVE SOURCEBOOK }"
 Correct output: 
 \`\`\`markdown
 \\title{ CONTROL PIPE SOURCEBOOK }
+\`\`\`
+
+User request: "replace usa with india"
+Selected text: "Printed in U.S.A."
+Correct output:
+\`\`\`markdown
+Printed in india
+\`\`\`
+
+User request: "replace america with france"
+Selected text: "Made in U.S.A."
+Correct output:
+\`\`\`markdown
+Made in france
 \`\`\`
 `;
 
