@@ -129,7 +129,12 @@ export default function MarkdownRenderer({
   // Update viewport content for windowed view
   const updateWindowedViewportContent = useCallback(() => {
     const visibleText = visibleLines.join('\n');
-    const startChar = contentLines.slice(0, currentWindowStart).join('\n').length;
+    // Calculate the character position in the full document
+    let startChar = 0;
+    if (currentWindowStart > 0) {
+      const beforeLines = contentLines.slice(0, currentWindowStart);
+      startChar = beforeLines.join('\n').length + (beforeLines.length > 0 ? 1 : 0); // +1 for the newline after previous content
+    }
     const endChar = startChar + visibleText.length;
 
     const viewport: ViewportContent = {
@@ -140,6 +145,14 @@ export default function MarkdownRenderer({
       viewportHeight: WINDOW_SIZE
     };
 
+    console.log(`Windowed viewport updated:`, {
+      windowStart: currentWindowStart,
+      textLength: visibleText.length,
+      startChar,
+      endChar,
+      preview: visibleText.substring(0, 100) + '...'
+    });
+
     setViewportContent(viewport);
     onViewportChange?.(viewport);
   }, [visibleLines, contentLines, currentWindowStart, onViewportChange]);
@@ -147,12 +160,21 @@ export default function MarkdownRenderer({
   // Extract visible text content from DOM elements (for markdown mode)
   const getTextFromElement = useCallback((element: Element): string => {
     let text = '';
-    for (const node of element.childNodes) {
+    const processNode = (node: ChildNode): string => {
       if (node.nodeType === Node.TEXT_NODE) {
-        text += node.textContent || '';
+        return node.textContent || '';
       } else if (node.nodeType === Node.ELEMENT_NODE) {
-        text += getTextFromElement(node as Element);
+        let nodeText = '';
+        for (const child of (node as Element).childNodes) {
+          nodeText += processNode(child);
+        }
+        return nodeText;
       }
+      return '';
+    };
+    
+    for (const node of element.childNodes) {
+      text += processNode(node);
     }
     return text;
   }, []);
@@ -207,7 +229,7 @@ export default function MarkdownRenderer({
 
     setViewportContent(viewport);
     onViewportChange?.(viewport);
-  }, [content, onViewportChange, getTextFromElement]);
+  }, [onViewportChange, getTextFromElement]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -244,12 +266,28 @@ export default function MarkdownRenderer({
 
   // Update viewport content when window changes
   useEffect(() => {
-    if (isRawTextFile()) {
-      updateWindowedViewportContent();
-    } else {
-      updateViewportContent();
-    }
+    // Use requestAnimationFrame to avoid synchronous setState warnings
+    const updateViewport = () => {
+      if (isRawTextFile()) {
+        updateWindowedViewportContent();
+      } else {
+        updateViewportContent();
+      }
+    };
+    
+    requestAnimationFrame(updateViewport);
   }, [currentWindowStart, visibleLines, isRawTextFile, updateWindowedViewportContent, updateViewportContent]);
+
+  // Force viewport update when content changes in windowed mode
+  useEffect(() => {
+    if (isRawTextFile() && content) {
+      // Small delay to ensure DOM is updated and avoid synchronous setState
+      const timer = setTimeout(() => {
+        updateWindowedViewportContent();
+      }, 10);
+      return () => clearTimeout(timer);
+    }
+  }, [content, isRawTextFile, updateWindowedViewportContent]);
 
   // Selection handling
   useEffect(() => {
@@ -366,7 +404,7 @@ export default function MarkdownRenderer({
 
     document.addEventListener('selectionchange', handleSelection);
     return () => document.removeEventListener('selectionchange', handleSelection);
-  }, [onSelection, isRawTextFile, content]);
+  }, [onSelection, isRawTextFile, content, cleanSelectedText, currentWindowStart, isWindowed]);
 
   // Update viewport content on scroll and resize (for markdown mode)
   useEffect(() => {
