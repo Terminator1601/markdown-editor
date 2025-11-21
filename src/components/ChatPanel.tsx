@@ -124,7 +124,7 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
           >
             <div className={`flex max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}>
               {/* Avatar */}
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-1 ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
                 {message.type === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3" />}
               </div>
@@ -164,7 +164,7 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
       {/* Input Area */}
       <div className="p-4 bg-background border-t border-border">
         <form onSubmit={handleSubmit} className="relative group">
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/20 to-violet-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          <div className="absolute inset-0 bg-linear-to-r from-primary/20 to-violet-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <div className="relative flex items-end gap-2 bg-background rounded-xl border border-border shadow-sm p-2 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-200">
             <textarea
               ref={inputRef}
@@ -172,7 +172,7 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask AI to edit..."
-              className="flex-1 max-h-32 min-h-[44px] w-full resize-none bg-transparent border-0 focus:ring-0 p-2 text-sm placeholder:text-muted-foreground/70"
+              className="flex-1 max-h-32 min-h-11 w-full resize-none bg-transparent border-0 focus:ring-0 p-2 text-sm placeholder:text-muted-foreground/70"
               rows={1}
               disabled={isProcessing}
             />

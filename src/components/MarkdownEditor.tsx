@@ -334,7 +334,7 @@ export default function MarkdownEditor() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
+      <div className="h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-gray-100">
         <div className="text-center p-8 bg-white rounded-2xl shadow-2xl border border-gray-200">
           <div className="relative mb-6">
             <RefreshCw className="w-12 h-12 animate-spin mx-auto text-blue-500" />
@@ -358,11 +358,11 @@ export default function MarkdownEditor() {
       <div className="h-16 border-b border-border bg-background/80 backdrop-blur-md flex items-center justify-between px-6 z-50">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary to-violet-600 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center transform hover:scale-105 transition-transform duration-200">
+            <div className="w-10 h-10 bg-linear-to-br from-primary to-violet-600 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center transform hover:scale-105 transition-transform duration-200">
               <span className="text-white font-bold text-xl">M</span>
             </div>
             <div>
-              <h1 className="text-lg font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">Markdown Editor</h1>
+              <h1 className="text-lg font-bold bg-linear-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">Markdown Editor</h1>
               <div className="flex items-center space-x-2">
                 <div className={`w-2 h-2 rounded-full ${documentState.content ? 'bg-emerald-500 animate-pulse' : 'bg-muted-foreground'}`}></div>
                 <span className="text-xs text-muted-foreground font-medium">

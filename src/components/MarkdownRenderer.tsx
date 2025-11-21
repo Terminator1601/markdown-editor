@@ -26,7 +26,6 @@ export default function MarkdownRenderer({
   fileName
 }: MarkdownRendererProps) {
   const [selectedText, setSelectedText] = useState<Selection | null>(null);
-  const [viewportContent, setViewportContent] = useState<ViewportContent | null>(null);
   const [currentWindowStart, setCurrentWindowStart] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -153,7 +152,6 @@ export default function MarkdownRenderer({
       preview: visibleText.substring(0, 100) + '...'
     });
 
-    setViewportContent(viewport);
     onViewportChange?.(viewport);
   }, [visibleLines, contentLines, currentWindowStart, onViewportChange]);
 
@@ -227,7 +225,6 @@ export default function MarkdownRenderer({
       viewportHeight: containerRect.height
     };
 
-    setViewportContent(viewport);
     onViewportChange?.(viewport);
   }, [onViewportChange, getTextFromElement]);
 
