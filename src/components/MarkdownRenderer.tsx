@@ -16,7 +16,7 @@ interface MarkdownRendererProps {
 }
 
 // Virtual window configuration
-const WINDOW_SIZE = 10; // Number of lines to show
+const WINDOW_SIZE = 20; // Number of lines to show
 const SCROLL_BUFFER = 2; // Extra lines to keep for smooth scrolling
 
 export default function MarkdownRenderer({
