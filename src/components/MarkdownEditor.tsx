@@ -21,6 +21,7 @@ export default function MarkdownEditor() {
   const [selectedText, setSelectedText] = useState<Selection | null>(null);
   const [viewportContent, setViewportContent] = useState<ViewportContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   const addAssistantMessageRef = useRef<((content: string) => void) | null>(null);
 
   // Load initial content and saved state
@@ -31,7 +32,6 @@ export default function MarkdownEditor() {
         const savedState = loadFromLocalStorage();
         if (savedState && savedState.content) {
           setDocumentState(savedState);
-          setIsLoading(false);
           return;
         }
 
@@ -48,13 +48,28 @@ export default function MarkdownEditor() {
           setDocumentState(newState);
         }
       } catch (error) {
-        console.error('Failed to load content:', error);
-      } finally {
-        setIsLoading(false);
+        console.error('Error loading initial content:', error);
       }
     };
 
     loadInitialContent();
+    
+    // 4-second loading timer with progress
+    const startTime = Date.now();
+    const duration = 4000; // 4 seconds
+    
+    const progressInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min((elapsed / duration) * 100, 100);
+      setLoadingProgress(progress);
+      
+      if (progress >= 100) {
+        clearInterval(progressInterval);
+        setTimeout(() => setIsLoading(false), 200); // Small delay for smooth transition
+      }
+    }, 50); // Update every 50ms for smooth progress
+    
+    return () => clearInterval(progressInterval);
   }, []);
 
   // Debounced save to localStorage
@@ -334,18 +349,43 @@ export default function MarkdownEditor() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-linear-to-br from-slate-50 to-gray-100">
-        <div className="text-center p-8 bg-white rounded-2xl shadow-2xl border border-gray-200">
-          <div className="relative mb-6">
-            <RefreshCw className="w-12 h-12 animate-spin mx-auto text-blue-500" />
-            <div className="absolute inset-0 w-12 h-12 border-4 border-blue-200 rounded-full animate-ping mx-auto"></div>
+      <div className="h-screen flex items-center justify-center bg-background text-foreground">
+        <div className="text-center p-10 bg-background border border-border rounded-2xl shadow-2xl shadow-primary/10 max-w-md">
+          {/* Logo matching the toolbar */}
+          <div className="flex justify-center mb-8">
+            <div className="w-16 h-16 bg-linear-to-br from-primary to-violet-600 rounded-xl shadow-lg shadow-primary/20 flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-2xl">M</span>
+            </div>
           </div>
-          <p className="text-lg font-semibold text-gray-800 mb-2">Loading document...</p>
-          <p className="text-sm text-gray-600">Preparing your markdown editor</p>
-          <div className="flex justify-center space-x-1 mt-4">
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+          
+          <h1 className="text-2xl font-bold bg-linear-to-r from-foreground to-muted-foreground bg-clip-text text-transparent mb-3">
+            Welcome to Markdown Editor
+          </h1>
+          <p className="text-muted-foreground mb-8 text-lg">Please wait while we load everything for you</p>
+          
+          {/* Progress Bar matching the design system */}
+          <div className="w-full max-w-sm mx-auto mb-6">
+            <div className="h-3 bg-secondary rounded-full overflow-hidden border border-border">
+              <div 
+                className="h-full bg-linear-to-r from-primary to-violet-600 rounded-full transition-all duration-300 ease-out shadow-inner"
+                style={{ width: `${loadingProgress}%` }}
+              ></div>
+            </div>
+            <div className="flex justify-between items-center mt-3">
+              <span className="text-sm text-muted-foreground font-medium">Loading...</span>
+              <span className="text-sm font-medium text-primary">{Math.round(loadingProgress)}%</span>
+            </div>
+          </div>
+          
+          {/* Spinner matching the toolbar refresh icon */}
+          <div className="flex justify-center mb-6">
+            <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+          </div>
+          
+          <div className="flex justify-center space-x-1">
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
           </div>
         </div>
       </div>
