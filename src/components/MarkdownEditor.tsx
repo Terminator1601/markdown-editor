@@ -5,7 +5,7 @@ import { Undo, Redo, Save, RefreshCw } from 'lucide-react';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import ChatPanel from '@/components/ChatPanel';
 import DiffViewer from '@/components/DiffViewer';
-import { DocumentState, EditRequest, EditProposal, Selection } from '@/types';
+import { DocumentState, EditRequest, EditProposal, Selection, ViewportContent } from '@/types';
 import { saveToLocalStorage, loadFromLocalStorage, debounce } from '@/utils/storage';
 
 export default function MarkdownEditor() {
@@ -19,6 +19,7 @@ export default function MarkdownEditor() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentProposal, setCurrentProposal] = useState<EditProposal | null>(null);
   const [selectedText, setSelectedText] = useState<Selection | null>(null);
+  const [viewportContent, setViewportContent] = useState<ViewportContent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const addAssistantMessageRef = useRef<((content: string) => void) | null>(null);
 
@@ -70,45 +71,110 @@ export default function MarkdownEditor() {
   const handleEditRequest = async (request: EditRequest) => {
     setIsProcessing(true);
 
-    // Determine what content to send
+    // Determine what content to send and prepare parameters
     let contentToSend = documentState.content;
     let isSelection = false;
+    let selectedTextToSend = '';
+    let selectionStart = 0;
+    let selectionEnd = documentState.content.length;
+    let useViewport = false;
 
+    // Priority: 1. Selected text, 2. Viewport content, 3. Full document
     if (selectedText && selectedText.text.trim()) {
-      contentToSend = selectedText.text;
       isSelection = true;
+      selectedTextToSend = selectedText.text;
+      selectionStart = selectedText.start;
+      selectionEnd = selectedText.end;
+      contentToSend = documentState.content; // Keep full content for context but send selected text separately
+      
+      console.log(`Processing selected text: "${selectedText.text.substring(0, 50)}..." (${selectionStart}-${selectionEnd})`);
+    } else if (viewportContent && viewportContent.text.trim()) {
+      // Use viewport content when no text is selected
+      useViewport = true;
+      selectedTextToSend = viewportContent.text;
+      selectionStart = viewportContent.start;
+      selectionEnd = viewportContent.end;
+      contentToSend = documentState.content;
+      
+      console.log(`Processing viewport content: "${viewportContent.text.substring(0, 50)}..." (${selectionStart}-${selectionEnd})`);
+      console.log(`Viewport info - scrollTop: ${viewportContent.scrollTop}, height: ${viewportContent.viewportHeight}`);
     }
 
     try {
+      const requestBody = {
+        messages: [
+          { role: 'user', content: request.text }
+        ],
+        currentContent: contentToSend,
+        isSelection: isSelection || useViewport,
+        selectedText: selectedTextToSend,
+        selectionStart,
+        selectionEnd,
+        isViewport: useViewport,
+        viewportInfo: useViewport ? {
+          scrollTop: viewportContent?.scrollTop,
+          viewportHeight: viewportContent?.viewportHeight
+        } : undefined
+      };
+
+      console.log('Sending request:', { 
+        isSelection: isSelection || useViewport, 
+        selectedTextLength: selectedTextToSend.length,
+        contentLength: contentToSend.length,
+        useViewport
+      });
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [
-            { role: 'user', content: request.text }
-          ],
-          currentContent: contentToSend,
-          isSelection
-        })
+        body: JSON.stringify(requestBody)
       });
 
-      if (!response.ok) throw new Error('Failed to get response');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get response');
+      }
       if (!response.body) throw new Error('No response body');
 
-      // Read headers for smart context info
+      // Read headers for context info
       const targetStartHeader = response.headers.get('X-Target-Start');
       const targetEndHeader = response.headers.get('X-Target-End');
+      const isSelectionHeader = response.headers.get('X-Is-Selection') === 'true';
+      const isViewportHeader = response.headers.get('X-Is-Viewport') === 'true';
+      const originalSelectionStartHeader = response.headers.get('X-Original-Selection-Start');
+      const originalSelectionEndHeader = response.headers.get('X-Original-Selection-End');
 
       let targetStart = 0;
       let targetEnd = documentState.content.length;
 
+      // CRITICAL FIX: Always use the original selection positions for selected text
+      // This ensures we replace exactly what was selected, not what headers suggest
       if (isSelection && selectedText) {
+        // Use original selection positions first
         targetStart = selectedText.start;
         targetEnd = selectedText.end;
+        
+        // Double-check with API headers if available
+        if (originalSelectionStartHeader && originalSelectionEndHeader) {
+          const apiStart = parseInt(originalSelectionStartHeader);
+          const apiEnd = parseInt(originalSelectionEndHeader);
+          if (apiStart !== targetStart || apiEnd !== targetEnd) {
+            console.warn(`Selection position mismatch: Frontend(${targetStart}-${targetEnd}) vs API(${apiStart}-${apiEnd})`);
+          }
+        }
+        
+        console.log(`Using ORIGINAL selection positions: ${targetStart}-${targetEnd}`);
+      } else if (useViewport && viewportContent) {
+        targetStart = viewportContent.start;
+        targetEnd = viewportContent.end;
+        console.log(`Using ORIGINAL viewport positions: ${targetStart}-${targetEnd}`);
       } else if (targetStartHeader && targetEndHeader) {
         targetStart = parseInt(targetStartHeader);
         targetEnd = parseInt(targetEndHeader);
+        console.log(`Using API-determined positions: ${targetStart}-${targetEnd}`);
       }
+
+      console.log(`Response targeting: ${targetStart}-${targetEnd}, isSelection: ${isSelectionHeader}, isViewport: ${isViewportHeader}`);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -128,16 +194,42 @@ export default function MarkdownEditor() {
       if (markdownMatch) {
         const newContent = markdownMatch[1];
 
-        // Reconstruct the full document
+        // CRITICAL VALIDATION: For selected text, verify we're only replacing what was selected
+        if (isSelection && selectedText) {
+          const originalSelectedContent = documentState.content.substring(targetStart, targetEnd);
+          console.log(`Original selected: "${originalSelectedContent}"`);
+          console.log(`AI returned: "${newContent}"`);
+          console.log(`Selection boundaries: ${targetStart}-${targetEnd}`);
+          
+          // Double-check that our selection boundaries are correct
+          if (originalSelectedContent !== selectedText.text) {
+            console.warn('Selection mismatch detected! Using original selection text for safety.');
+            // Find the exact position of the selected text in the document
+            const exactIndex = documentState.content.indexOf(selectedText.text);
+            if (exactIndex !== -1) {
+              targetStart = exactIndex;
+              targetEnd = exactIndex + selectedText.text.length;
+              console.log(`Corrected positions: ${targetStart}-${targetEnd}`);
+            }
+          }
+        }
+
+        // Reconstruct the full document with proper positioning
         const before = documentState.content.substring(0, targetStart);
         const after = documentState.content.substring(targetEnd);
         const fullModifiedContent = before + newContent + after;
+
+        console.log(`Document reconstruction:
+- Before: "${before.substring(Math.max(0, before.length - 50))}"
+- New content: "${newContent}"  
+- After: "${after.substring(0, 50)}"
+- Total length: ${fullModifiedContent.length} (was ${documentState.content.length})`);
 
         const proposal: EditProposal = {
           id: Date.now().toString(),
           original: documentState.content,
           modified: fullModifiedContent,
-          description: isSelection ? 'AI Edit (Selection)' : 'AI Edit (Smart Context)'
+          description: isSelectionHeader ? 'AI Edit (Selected Text)' : 'AI Edit (Smart Context)'
         };
         setCurrentProposal(proposal);
 
@@ -147,7 +239,7 @@ export default function MarkdownEditor() {
           addAssistantMessageRef.current(explanation);
         }
       } else {
-        // Just a chat response
+        // Just a chat response without code block
         if (addAssistantMessageRef.current) {
           addAssistantMessageRef.current(accumulatedContent);
         }
@@ -156,7 +248,7 @@ export default function MarkdownEditor() {
     } catch (error) {
       console.error('Edit request failed:', error);
       if (addAssistantMessageRef.current) {
-        addAssistantMessageRef.current('Sorry, I encountered an error processing your request.');
+        addAssistantMessageRef.current('Sorry, I encountered an error processing your request. Please try again.');
       }
     } finally {
       setIsProcessing(false);
@@ -316,6 +408,8 @@ export default function MarkdownEditor() {
             <MarkdownRenderer
               content={documentState.content}
               onSelection={setSelectedText}
+              onViewportChange={setViewportContent}
+              fileName="manual.mmd"
             />
 
             {/* Floating Diff Viewer Overlay */}

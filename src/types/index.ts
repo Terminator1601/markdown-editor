@@ -27,4 +27,12 @@ export interface Selection {
   text: string;
 }
 
+export interface ViewportContent {
+  text: string;
+  start: number;
+  end: number;
+  scrollTop: number;
+  viewportHeight: number;
+}
+
 export type EditAction = 'accept' | 'discard' | 'undo' | 'redo';
