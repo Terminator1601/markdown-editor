@@ -6,7 +6,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
 import { Selection, ViewportContent } from '@/types';
-import { ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronUp, ChevronDown, Search, X, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface MarkdownRendererProps {
   content: string;
@@ -27,8 +27,13 @@ export default function MarkdownRenderer({
 }: MarkdownRendererProps) {
   const [selectedText, setSelectedText] = useState<Selection | null>(null);
   const [currentWindowStart, setCurrentWindowStart] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Array<{lineIndex: number, charIndex: number, line: string}>>([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(-1);
+  const [showSearch, setShowSearch] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Split content into lines for windowed view
   const contentLines = useMemo(() => {
@@ -124,6 +129,74 @@ export default function MarkdownRenderer({
       .join('\n')
       .trim();
   }, [isRawTextFile]);
+
+  // Search functionality
+  const performSearch = useCallback((query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(-1);
+      return;
+    }
+
+    const results: Array<{lineIndex: number, charIndex: number, line: string}> = [];
+    const searchTerm = query.toLowerCase();
+    
+    contentLines.forEach((line, lineIndex) => {
+      const lowerLine = line.toLowerCase();
+      let charIndex = 0;
+      
+      while ((charIndex = lowerLine.indexOf(searchTerm, charIndex)) !== -1) {
+        results.push({
+          lineIndex,
+          charIndex,
+          line: line
+        });
+        charIndex += searchTerm.length;
+      }
+    });
+    
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+    
+    // Navigate to first result if found
+    if (results.length > 0 && isRawTextFile()) {
+      const firstResult = results[0];
+      const targetWindowStart = Math.max(0, firstResult.lineIndex - Math.floor(WINDOW_SIZE / 2));
+      setCurrentWindowStart(targetWindowStart);
+    }
+  }, [contentLines, isRawTextFile]);
+
+  const navigateSearch = useCallback((direction: 'next' | 'prev') => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex;
+    if (direction === 'next') {
+      newIndex = currentSearchIndex + 1;
+      if (newIndex >= searchResults.length) newIndex = 0;
+    } else {
+      newIndex = currentSearchIndex - 1;
+      if (newIndex < 0) newIndex = searchResults.length - 1;
+    }
+    
+    setCurrentSearchIndex(newIndex);
+    
+    // Navigate to the result in windowed view
+    if (isRawTextFile()) {
+      const result = searchResults[newIndex];
+      const targetWindowStart = Math.max(0, result.lineIndex - Math.floor(WINDOW_SIZE / 2));
+      setCurrentWindowStart(targetWindowStart);
+    }
+  }, [searchResults, currentSearchIndex, isRawTextFile]);
+
+  const highlightSearchTerm = useCallback((text: string, isCurrentResult: boolean = false) => {
+    if (!searchQuery.trim()) return text;
+    
+    const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, (match) => {
+      const bgClass = isCurrentResult ? 'bg-yellow-400 text-black' : 'bg-yellow-200 text-black';
+      return `<mark class="${bgClass} px-1 rounded">${match}</mark>`;
+    });
+  }, [searchQuery]);
 
   // Update viewport content for windowed view
   const updateWindowedViewportContent = useCallback(() => {
@@ -231,6 +304,44 @@ export default function MarkdownRenderer({
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Search shortcuts
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 100);
+        return;
+      }
+      
+      if (e.key === 'Escape' && showSearch) {
+        e.preventDefault();
+        setShowSearch(false);
+        setSearchQuery('');
+        setSearchResults([]);
+        setCurrentSearchIndex(-1);
+        return;
+      }
+      
+      if (showSearch) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            navigateSearch('prev');
+          } else {
+            navigateSearch('next');
+          }
+          return;
+        }
+        if (e.key === 'F3') {
+          e.preventDefault();
+          if (e.shiftKey) {
+            navigateSearch('prev');
+          } else {
+            navigateSearch('next');
+          }
+          return;
+        }
+      }
+      
       if (!isRawTextFile()) return;
       
       if (e.key === 'ArrowUp' && e.ctrlKey && windowMetrics.hasPrevious) {
@@ -250,7 +361,16 @@ export default function MarkdownRenderer({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [windowMetrics.hasPrevious, windowMetrics.hasMore, scrollWindow, contentLines.length, isRawTextFile]);
+  }, [windowMetrics.hasPrevious, windowMetrics.hasMore, scrollWindow, contentLines.length, isRawTextFile, showSearch, navigateSearch, searchQuery]);
+
+  // Handle search query changes
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      performSearch(searchQuery);
+    }, 300); // Debounce search
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, performSearch]);
 
   // Set up wheel event listener for windowed view
   useEffect(() => {
@@ -459,6 +579,22 @@ export default function MarkdownRenderer({
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => {
+                      setShowSearch(!showSearch);
+                      if (!showSearch) {
+                        setTimeout(() => searchInputRef.current?.focus(), 100);
+                      }
+                    }}
+                    className={`p-2 rounded transition-colors ${
+                      showSearch 
+                        ? 'bg-primary/10 text-primary' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    }`}
+                    title="Search (Ctrl+F)"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
                   <div className="flex items-center space-x-1">
                     <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
                       <div 
@@ -470,6 +606,73 @@ export default function MarkdownRenderer({
                   </div>
                 </div>
               </div>
+
+              {/* Search Bar */}
+              {showSearch && (
+                <div className="px-4 py-3 bg-background/50 border-b border-border">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1 relative">
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search in document..."
+                        className="w-full px-3 py-1.5 text-sm bg-background border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            setSearchResults([]);
+                            setCurrentSearchIndex(-1);
+                          }}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => navigateSearch('prev')}
+                        disabled={searchResults.length === 0}
+                        className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                        title="Previous (Shift+Enter)"
+                      >
+                        <ArrowUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => navigateSearch('next')}
+                        disabled={searchResults.length === 0}
+                        className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed rounded"
+                        title="Next (Enter)"
+                      >
+                        <ArrowDown className="w-3 h-3" />
+                      </button>
+                      <span className="text-xs text-muted-foreground min-w-0 whitespace-nowrap px-2">
+                        {searchResults.length > 0 ? (
+                          `${currentSearchIndex + 1} of ${searchResults.length}`
+                        ) : (
+                          searchQuery ? 'No results' : ''
+                        )}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setShowSearch(false);
+                        setSearchQuery('');
+                        setSearchResults([]);
+                        setCurrentSearchIndex(-1);
+                      }}
+                      className="p-1.5 text-muted-foreground hover:text-foreground rounded"
+                      title="Close (Esc)"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Navigation controls */}
               <div className="flex items-center justify-between px-4 py-2 bg-background/30 border-b border-border">
@@ -497,17 +700,31 @@ export default function MarkdownRenderer({
               {/* Windowed content display */}
               <div className="relative">
                 <pre className="whitespace-pre-wrap font-mono text-sm text-foreground leading-relaxed p-6 min-h-[600px] overflow-x-auto">
-                  {visibleLines.map((line, index) => (
-                    <div 
-                      key={currentWindowStart + index}
-                      className={`${index === 0 || index === visibleLines.length - 1 ? 'opacity-60' : ''} transition-opacity duration-200 min-h-6 flex`}
-                    >
-                      <span className="inline-block w-8 text-right text-muted-foreground/50 mr-3 text-xs select-none pointer-events-none shrink-0">
-                        {currentWindowStart + index + 1}
-                      </span>
-                      <span className="flex-1 whitespace-pre-wrap">{line || ' '}</span>
-                    </div>
-                  ))}
+                  {visibleLines.map((line, index) => {
+                    const globalLineIndex = currentWindowStart + index;
+                    const currentResult = searchResults[currentSearchIndex];
+                    const isCurrentResultLine = currentResult && currentResult.lineIndex === globalLineIndex;
+                    
+                    let displayLine = line;
+                    if (searchQuery && line.toLowerCase().includes(searchQuery.toLowerCase())) {
+                      displayLine = highlightSearchTerm(line, isCurrentResultLine);
+                    }
+                    
+                    return (
+                      <div 
+                        key={currentWindowStart + index}
+                        className={`${index === 0 || index === visibleLines.length - 1 ? 'opacity-60' : ''} transition-opacity duration-200 min-h-6 flex`}
+                      >
+                        <span className="inline-block w-8 text-right text-muted-foreground/50 mr-3 text-xs select-none pointer-events-none shrink-0">
+                          {currentWindowStart + index + 1}
+                        </span>
+                        <span 
+                          className="flex-1 whitespace-pre-wrap"
+                          dangerouslySetInnerHTML={{ __html: displayLine || ' ' }}
+                        />
+                      </div>
+                    );
+                  })}
                   
                   {/* Fade indicators */}
                   {windowMetrics.hasPrevious && (
@@ -525,7 +742,7 @@ export default function MarkdownRenderer({
                   Window: {WINDOW_SIZE} lines | Buffer: {SCROLL_BUFFER} lines
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  Ctrl+Home: Start | Ctrl+End: End
+                  Ctrl+F: Search | Ctrl+Home/End: Navigation
                 </span>
               </div>
             </div>
