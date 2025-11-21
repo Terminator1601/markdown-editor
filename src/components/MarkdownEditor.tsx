@@ -154,10 +154,18 @@ export default function MarkdownEditor() {
         targetStart = selectedText.start;
         targetEnd = selectedText.end;
         
+        console.log(`ORIGINAL selection data:`, {
+          start: selectedText.start,
+          end: selectedText.end,
+          text: selectedText.text.substring(0, 100) + '...',
+          textLength: selectedText.text.length
+        });
+        
         // Double-check with API headers if available
         if (originalSelectionStartHeader && originalSelectionEndHeader) {
           const apiStart = parseInt(originalSelectionStartHeader);
           const apiEnd = parseInt(originalSelectionEndHeader);
+          console.log(`API header positions: ${apiStart}-${apiEnd}`);
           if (apiStart !== targetStart || apiEnd !== targetEnd) {
             console.warn(`Selection position mismatch: Frontend(${targetStart}-${targetEnd}) vs API(${apiStart}-${apiEnd})`);
           }
