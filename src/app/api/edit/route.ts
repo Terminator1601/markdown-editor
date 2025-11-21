@@ -48,9 +48,8 @@ export async function POST(request: NextRequest) {
         range: `${startChar}-${endChar}`,
         preview: selectedText.substring(0, 100) + (selectedText.length > 100 ? '...' : '')
       });
-    }
       
-      console.log(`Edit API: Working with selected text (${startChar}-${endChar}): "${selectedText.substring(0, 100)}..."`);
+      logger.info(`[${requestId}] Edit API: Working with selected text (${startChar}-${endChar}): "${selectedText.substring(0, 100)}..."`);
     }
 
     // If we have full content and no specific selection, use section targeting
@@ -129,7 +128,7 @@ If the request is too general, return empty array. Only return JSON.`;
     }
 
     // Generate edit proposal using OpenAI
-    const editProposal = await generateOpenAIEditProposal(message, targetContent, isWorkingWithSelection);
+    const editProposal = await generateOpenAIEditProposal(requestId, message, targetContent, isWorkingWithSelection);
 
     return NextResponse.json({
       ...editProposal,
@@ -149,7 +148,7 @@ If the request is too general, return empty array. Only return JSON.`;
   }
 }
 
-async function generateOpenAIEditProposal(message: string, content: string, isSelection: boolean = false) {
+async function generateOpenAIEditProposal(requestId: string, message: string, content: string, isSelection: boolean = false) {
   try {
     const systemPrompt = `You are an expert document editor specializing in Markdown and LaTeX documents.
 
@@ -232,11 +231,11 @@ Remember: Return ONLY the edited content with preserved formatting.`;
     logger.error(`OpenAI edit generation failed:`, error);
     
     // Fallback to simple text transformations
-    return generateSimpleEditProposal(message, content);
+    return generateSimpleEditProposal(requestId, message, content);
   }
 }
 
-async function generateSimpleEditProposal(message: string, content: string) {
+async function generateSimpleEditProposal(requestId: string, message: string, content: string) {
   const lowerMessage = message.toLowerCase();
   let modified = content;
   let description = 'Applied text transformation';
