@@ -57,3 +57,67 @@ export const formatDiffForDisplay = (diffLines: DiffLine[]): string => {
     })
     .join('\n');
 };
+
+// Generate a contextual diff that shows only changed sections with minimal context
+export const generateContextualDiff = (original: string, modified: string, contextLines: number = 3): DiffLine[] => {
+  const allDiffLines = generateDiff(original, modified);
+  
+  // Find all changed lines (added or removed)
+  const changedLineIndices = allDiffLines
+    .map((line, index) => ({ line, index }))
+    .filter(({ line }) => line.type === 'added' || line.type === 'removed')
+    .map(({ index }) => index);
+  
+  if (changedLineIndices.length === 0) {
+    return allDiffLines;
+  }
+  
+  // Create ranges of lines to include (changed lines + context)
+  const ranges: Array<{ start: number; end: number }> = [];
+  
+  for (const changeIndex of changedLineIndices) {
+    const start = Math.max(0, changeIndex - contextLines);
+    const end = Math.min(allDiffLines.length - 1, changeIndex + contextLines);
+    ranges.push({ start, end });
+  }
+  
+  // Merge overlapping ranges
+  const mergedRanges: Array<{ start: number; end: number }> = [];
+  ranges.sort((a, b) => a.start - b.start);
+  
+  for (const range of ranges) {
+    if (mergedRanges.length === 0) {
+      mergedRanges.push(range);
+    } else {
+      const lastRange = mergedRanges[mergedRanges.length - 1];
+      if (range.start <= lastRange.end + 1) {
+        // Overlapping or adjacent ranges, merge them
+        lastRange.end = Math.max(lastRange.end, range.end);
+      } else {
+        mergedRanges.push(range);
+      }
+    }
+  }
+  
+  // Extract lines for merged ranges
+  const contextualDiffLines: DiffLine[] = [];
+  
+  for (let i = 0; i < mergedRanges.length; i++) {
+    const range = mergedRanges[i];
+    
+    // Add separator between ranges (except for first range)
+    if (i > 0) {
+      contextualDiffLines.push({
+        content: '...',
+        type: 'unchanged'
+      });
+    }
+    
+    // Add lines in this range
+    for (let lineIndex = range.start; lineIndex <= range.end; lineIndex++) {
+      contextualDiffLines.push(allDiffLines[lineIndex]);
+    }
+  }
+  
+  return contextualDiffLines;
+};
