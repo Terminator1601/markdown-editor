@@ -11,6 +11,93 @@ const openai = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Format transformation types
+interface FormatTransformRequest {
+    isTransformation: boolean;
+    type: string | null;
+    originalMessage: string;
+}
+
+// Format transformation detection
+function detectFormatTransformation(userMessage: string): FormatTransformRequest {
+    const message = userMessage.toLowerCase();
+    
+    const transformations = {
+        checkbox: /convert.*to.*checkbox|make.*checkbox|turn.*into.*checkbox|sections.*to.*checkbox/i,
+        mermaid: /make.*flowchart|create.*diagram|convert.*to.*mermaid|make.*sequence.*diagram|create.*chart/i,
+        list: /convert.*to.*list|make.*list|turn.*into.*list/i,
+        table: /convert.*to.*table|make.*table|turn.*into.*table/i,
+        heading: /convert.*to.*heading|make.*heading|turn.*into.*heading/i,
+        code: /convert.*to.*code|make.*code.*block|turn.*into.*code/i,
+        quote: /convert.*to.*quote|make.*quote|turn.*into.*quote/i
+    };
+    
+    for (const [type, regex] of Object.entries(transformations)) {
+        if (regex.test(message)) {
+            return {
+                isTransformation: true,
+                type,
+                originalMessage: userMessage
+            };
+        }
+    }
+    
+    return {
+        isTransformation: false,
+        type: null,
+        originalMessage: userMessage
+    };
+}
+
+// Generate specialized instructions for format transformations
+function generateFormatTransformInstructions(formatRequest: FormatTransformRequest): string {
+    const { type } = formatRequest;
+    
+    switch (type) {
+        case 'checkbox':
+            return `
+SPECIALIZED FORMAT TRANSFORMATION - CHECKBOX:
+- Convert headings/sections to checkbox format: - [ ] Item
+- Convert list items to checkboxes
+- Preserve the original text content
+- Use unchecked boxes by default: - [ ]
+- Maintain hierarchical structure if present
+`;
+        
+        case 'mermaid':
+            return `
+SPECIALIZED FORMAT TRANSFORMATION - MERMAID:
+- Wrap result in mermaid code block
+- Use appropriate mermaid syntax (flowchart, sequence, class, etc.)
+- For flowcharts: use 'flowchart TD' or 'flowchart LR'
+- For sequences: use 'sequenceDiagram'
+- Create proper node connections and relationships
+- Use meaningful node IDs and labels
+`;
+        
+        case 'list':
+            return `
+SPECIALIZED FORMAT TRANSFORMATION - LIST:
+- Convert text blocks to list items
+- Use - for bullet points or 1. for numbered lists
+- Maintain logical grouping
+- Preserve content hierarchy
+`;
+        
+        case 'table':
+            return `
+SPECIALIZED FORMAT TRANSFORMATION - TABLE:
+- Convert content to markdown table format
+- Use | for column separators
+- Include header row with alignment
+- Extract relevant data points for columns
+`;
+        
+        default:
+            return '';
+    }
+}
+
 export async function POST(req: Request) {
     const requestId = Math.random().toString(36).substr(2, 9);
     logger.info(`[${requestId}] Starting chat API request`);
@@ -220,10 +307,20 @@ Return ONLY the index of the most relevant section (0-${sections.length - 1}), o
 
         // Generate formatting-specific instructions
         const formattingInstructions = createFormattingInstructions(targetContent, isWorkingWithSelection);
+        
+        // Detect formatting transformation requests
+        const formatTransformRequest = detectFormatTransformation(userMessage);
+        const isFormatTransformation = formatTransformRequest.isTransformation;
+        
+        let specializedInstructions = '';
+        if (isFormatTransformation) {
+            specializedInstructions = generateFormatTransformInstructions(formatTransformRequest);
+            logger.info(`[${requestId}] Format transformation detected:`, formatTransformRequest);
+        }
 
-        const systemPrompt = `You are a helpful assistant that helps users edit Markdown/LaTeX documents.
+        const systemPrompt = `You are a helpful assistant that helps users edit Markdown/LaTeX documents and supports advanced format transformations.
 You will be provided with content from a document - either selected text or a relevant section.
-The user will ask you to make edits or ask questions about the content.
+The user will ask you to make edits, format transformations, or ask questions about the content.
 
 CRITICAL FORMATTING RULES - MUST FOLLOW EXACTLY:
 1. NEVER modify LaTeX commands or their syntax: \\title{}, \\section{}, \\chapter{}, \\begin{}, \\end{}, etc.
@@ -232,6 +329,62 @@ CRITICAL FORMATTING RULES - MUST FOLLOW EXACTLY:
 4. ONLY modify the content INSIDE braces {} when editing titles/sections
 5. Keep all formatting, punctuation, and structure exactly as provided
 6. If editing text, change ONLY the requested words, leave everything else untouched
+
+FORMAT TRANSFORMATION CAPABILITIES:
+- Convert sections/headings to checkboxes (- [ ] format)
+- Convert lists to different formats (numbered, bulleted, checkboxes)
+- Transform content to Mermaid diagram format (.mmd)
+- Convert text blocks to code blocks, quotes, or tables
+- Transform between different heading levels (# ## ###)
+- Convert content to specific markup formats
+
+MERMAID (.mmd) FORMAT TRANSFORMATIONS:
+- Flowcharts: Use flowchart TD/LR syntax
+- Sequence diagrams: Use sequenceDiagram syntax
+- Class diagrams: Use classDiagram syntax  
+- State diagrams: Use stateDiagram-v2 syntax
+- Gantt charts: Use gantt syntax
+- Pie charts: Use pie syntax
+- Git graphs: Use gitgraph syntax
+
+FORMAT TRANSFORMATION EXAMPLES:
+
+User request: "convert sections to checkboxes"
+Input: "# Task 1\n# Task 2\n# Task 3"
+Output:
+\`\`\`markdown
+- [ ] Task 1
+- [ ] Task 2
+- [ ] Task 3
+\`\`\`
+
+User request: "make this a flowchart"
+Input: "Process starts -> Validate data -> Save to database -> Send notification"
+Output:
+\`\`\`markdown
+\`\`\`mermaid
+flowchart TD
+    A[Process starts] --> B[Validate data]
+    B --> C[Save to database]
+    C --> D[Send notification]
+\`\`\`
+\`\`\`
+
+User request: "convert to sequence diagram"
+Input: "User logs in, Server validates, Database checks, Response sent"
+Output:
+\`\`\`markdown
+\`\`\`mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Server
+    participant D as Database
+    U->>S: Login request
+    S->>D: Validate credentials
+    D-->>S: Validation result
+    S-->>U: Login response
+\`\`\`
+\`\`\`
 
 INTELLIGENT TEXT MATCHING:
 - When user says "replace X with Y", look for variations of X in the text
@@ -257,6 +410,8 @@ RESPONSE RULES:
 - Make the minimal change possible - don't "improve" unrequested formatting
 
         ${formattingInstructions}
+        
+        ${specializedInstructions}
 
         Current context: ${sectionAnalysis ? 
             `Working with sections ${sectionAnalysis.relevantSections?.join(', ')} based on analysis` 
