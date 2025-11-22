@@ -89,10 +89,10 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
   return (
     <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="p-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="p-3 md:p-4 border-b border-border bg-background/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center space-x-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <Sparkles className="w-4 h-4 text-primary" />
+          <div className="w-6 h-6 md:w-8 md:h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+            <Sparkles className="w-3 h-3 md:w-4 md:h-4 text-primary" />
           </div>
           <div>
             <h2 className="text-sm font-semibold text-foreground">AI Assistant</h2>
@@ -104,7 +104,7 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
         </div>
 
         {selectedText && (
-          <div className="mt-3 p-2.5 bg-accent/50 rounded-lg border border-border/50 animate-fade-in">
+          <div className="mt-2 md:mt-3 p-2 md:p-2.5 bg-accent/50 rounded-lg border border-border/50 animate-fade-in">
             <div className="flex items-center space-x-2 mb-1">
               <span className="text-xs font-medium text-primary">Selected Text</span>
             </div>
@@ -116,13 +116,13 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+      <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-4 md:space-y-6 scroll-smooth">
         {messages.map((message) => (
           <div
             key={message.id}
             className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'} animate-slide-up`}
           >
-            <div className={`flex max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}>
+            <div className={`flex max-w-[90%] md:max-w-[85%] ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'} items-start gap-2`}>
               {/* Avatar */}
               <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-1 ${message.type === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
                 }`}>
@@ -162,7 +162,7 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-background border-t border-border">
+      <div className="p-3 md:p-4 bg-background border-t border-border">
         <form onSubmit={handleSubmit} className="relative group">
           <div className="absolute inset-0 bg-linear-to-r from-primary/20 to-violet-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           <div className="relative flex items-end gap-2 bg-background rounded-xl border border-border shadow-sm p-2 focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary/50 transition-all duration-200">
@@ -179,12 +179,12 @@ export default function ChatPanel({ onEditRequest, isProcessing, selectedText, o
             <button
               type="submit"
               disabled={!inputValue.trim() || isProcessing}
-              className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+              className="p-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm touch-manipulation"
             >
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>
           </div>
-          <div className="text-[10px] text-muted-foreground text-center mt-2 opacity-0 group-focus-within:opacity-100 transition-opacity">
+          <div className="text-[10px] text-muted-foreground text-center mt-2 opacity-0 group-focus-within:opacity-100 transition-opacity hidden md:block">
             Press Enter to send, Shift + Enter for new line
           </div>
         </form>

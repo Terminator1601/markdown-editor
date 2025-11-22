@@ -30,13 +30,13 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
   return (
     <div className="border border-border rounded-2xl bg-background/95 backdrop-blur-xl shadow-2xl overflow-hidden animate-slide-up ring-1 ring-black/5">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
-            <span className="text-lg">✨</span>
+      <div className="flex items-center justify-between p-3 md:p-4 border-b border-border bg-muted/30">
+        <div className="flex items-center space-x-2 md:space-x-3 min-w-0 flex-1">
+          <div className="w-6 h-6 md:w-8 md:h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+            <span className="text-sm md:text-lg">✨</span>
           </div>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">AI Proposal</h3>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-xs md:text-sm font-semibold text-foreground">AI Proposal</h3>
             <p className="text-xs text-muted-foreground">
               {changeStats.additions > 0 && (
                 <span className="text-emerald-600">+{changeStats.additions}</span>
@@ -49,10 +49,10 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 md:space-x-2">
           <button
             onClick={() => setShowDiff(!showDiff)}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors"
+            className="p-1.5 md:p-2 text-muted-foreground hover:text-foreground hover:bg-secondary rounded-lg transition-colors touch-manipulation"
             title={showDiff ? 'Hide diff' : 'Show diff'}
           >
             {showDiff ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -60,7 +60,7 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
           {showDiff && (
             <button
               onClick={() => setShowFullDiff(!showFullDiff)}
-              className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
+              className={`px-2 py-1 text-xs font-medium rounded transition-colors touch-manipulation ${
                 showFullDiff 
                   ? 'bg-primary/10 text-primary' 
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
@@ -70,20 +70,20 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
               {showFullDiff ? 'Context' : 'Full'}
             </button>
           )}
-          <div className="h-4 w-px bg-border mx-2"></div>
+          <div className="h-4 w-px bg-border mx-1 md:mx-2"></div>
           <button
             onClick={onDiscard}
-            className="flex items-center px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100"
+            className="flex items-center px-2 md:px-3 py-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-100 touch-manipulation"
           >
-            <X className="w-3.5 h-3.5 mr-1.5" />
-            Discard
+            <X className="w-3.5 h-3.5 mr-1 md:mr-1.5" />
+            <span className="hidden sm:inline">Discard</span>
           </button>
           <button
             onClick={onAccept}
-            className="flex items-center px-3 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm"
+            className="flex items-center px-2 md:px-3 py-1.5 text-xs font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors shadow-sm touch-manipulation"
           >
-            <Check className="w-3.5 h-3.5 mr-1.5" />
-            Accept
+            <Check className="w-3.5 h-3.5 mr-1 md:mr-1.5" />
+            <span className="hidden sm:inline">Accept</span>
           </button>
         </div>
       </div>
@@ -92,7 +92,7 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
       {showDiff && (
         <div className="p-0">
           {/* Unified diff view */}
-          <div className="max-h-[400px] overflow-auto font-mono text-sm">
+          <div className="max-h-[300px] md:max-h-[400px] overflow-auto font-mono text-xs md:text-sm">
             {diffLines.map((line, index) => {
               // Handle separator lines
               if (line.content === '...' && line.type === 'unchanged' && !line.oldLineNumber && !line.newLineNumber) {
@@ -113,16 +113,16 @@ export default function DiffViewer({ proposal, onAccept, onDiscard }: DiffViewer
                         : 'hover:bg-muted/50 border-l-2 border-transparent'
                     }`}
                 >
-                  <div className="w-12 shrink-0 text-[10px] text-muted-foreground/50 select-none py-1 px-2 text-right border-r border-border/50 bg-muted/20">
+                  <div className="w-8 md:w-12 shrink-0 text-[10px] text-muted-foreground/50 select-none py-1 px-1 md:px-2 text-right border-r border-border/50 bg-muted/20">
                     {line.oldLineNumber || ''}
                   </div>
-                  <div className="w-12 shrink-0 text-[10px] text-muted-foreground/50 select-none py-1 px-2 text-right border-r border-border/50 bg-muted/20">
+                  <div className="w-8 md:w-12 shrink-0 text-[10px] text-muted-foreground/50 select-none py-1 px-1 md:px-2 text-right border-r border-border/50 bg-muted/20">
                     {line.newLineNumber || ''}
                   </div>
-                  <div className="w-6 shrink-0 select-none py-1 text-center text-muted-foreground/70">
+                  <div className="w-4 md:w-6 shrink-0 select-none py-1 text-center text-muted-foreground/70">
                     {line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ''}
                   </div>
-                  <div className={`flex-1 py-1 px-2 whitespace-pre-wrap break-all ${line.type === 'added'
+                  <div className={`flex-1 py-1 px-1 md:px-2 whitespace-pre-wrap break-all ${line.type === 'added'
                       ? 'text-emerald-700 dark:text-emerald-400'
                       : line.type === 'removed'
                         ? 'text-red-700 dark:text-red-400 line-through opacity-70'
